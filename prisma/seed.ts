@@ -450,8 +450,19 @@ async function main() {
   await migrateLegacySymbols();
 
   // ---- Admin + documented dev test user ----
+  // In production the admin credentials MUST come from the environment
+  // (render.yaml generates a random ADMIN_PASSWORD) — never a default.
   const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@aadiinvest.local").toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "ChangeMe!Admin2026";
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("❌ [Fatal] ADMIN_PASSWORD is not set. Refusing to seed a production admin with a default password.");
+      console.error("   Set ADMIN_EMAIL and ADMIN_PASSWORD in the service's Environment settings.");
+      process.exit(1);
+    }
+    console.warn("⚠️  ADMIN_PASSWORD unset — falling back to the development-only default (NOT for production).");
+  }
+  const adminPasswordFinal = adminPassword ?? "ChangeMe!Admin2026";
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
@@ -460,7 +471,7 @@ async function main() {
       username: "admin",
       usernameLower: "admin",
       email: adminEmail,
-      passwordHash: await hashPassword(adminPassword),
+      passwordHash: await hashPassword(adminPasswordFinal),
       role: "ADMIN",
       emailVerified: true,
       displayName: "Administrator",

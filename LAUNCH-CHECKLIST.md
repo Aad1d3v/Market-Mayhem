@@ -39,24 +39,47 @@ Typecheck ✅ · 36/36 unit tests ✅ · 23/23 production e2e checks ✅ · clie
 
 ## Your remaining manual steps (in order)
 
-1. **Commit & push** — from `market MMayham/` (the folder connected to GitHub):
+1. **Get this folder (`puc`) into a git repo — this root is the launch source of truth.**
+   It is not a git repo yet, so from this folder:
    ```
+   git init
    git add -A
-   git commit -m "Fix deploy blockers: prisma/ at root, DB-ready wait, hardened Dockerfile + render.yaml"
-   git push
+   git commit -m "Market Mayhem — deploy-ready"
    ```
-   ⚠️ `git fetch` currently says **"Repository not found"** for `Aad1d3v/market-MMayham` —
-   the repo was deleted/renamed or you lost access. Fix this in the GitHub UI first:
-   create the repo (or re-grant access), then `git remote set-url origin <new-url>` if the name changed.
+   Then create a repo on GitHub and:
+   ```
+   git remote add origin <your-new-repo-url>
+   git push -u origin main
+   ```
+   ⚠️ The old remote `Aad1d3v/market-MMayham` returns **"Repository not found"** (deleted or
+   renamed) — that's why a fresh repo is needed. `git add -A` is safe here: `.gitignore`
+   already excludes `node_modules/`, `.env`, the nested repo copies, and all `*.log` files.
+   (The old `market MMayham/` copy has been restored to its last commit and left untouched.)
 
-2. **Deploy on Render** — pick ONE:
-   - **Blueprint (recommended):** Render Dashboard → New → Blueprint → select the repo.
-     Render reads `render.yaml`, provisions the free Postgres, and wires `DATABASE_URL` automatically.
-   - **Manual Web Service:** New → Web Service → Docker runtime. Add env vars manually:
-     `DATABASE_URL` (Render's Internal Connection String), `SESSION_SECRET` (any long random string),
-     `NODE_ENV=production`, `CLIENT_URL=https://<your-service>.onrender.com`,
-     `ADMIN_EMAIL` + `ADMIN_PASSWORD` (set these yourself — don't use the seed defaults in prod),
-     `MARKET_DATA_PROVIDER=simulated`.
+2. **Deploy on Render** — this is the step that decides whether `DATABASE_URL` arrives:
+
+   > 🔑 **Why your runtime failed with "DATABASE_URL is not set":** the container got no
+   > environment variables because a **plain Web Service does not read `render.yaml`**.
+   > The blueprint file is only consumed by the *Blueprint* flow. Pick ONE of the two
+   > paths below — both are configuration-only fixes; the Docker build is already green.
+
+   - **Blueprint (recommended, zero config):** Render Dashboard → New → **Blueprint** →
+     select the repo. Render reads `render.yaml`, provisions the free Postgres
+     (`aadiinvest-db`), and injects `DATABASE_URL` + `SESSION_SECRET` + `ADMIN_PASSWORD`
+     automatically. `CLIENT_URL` is derived at runtime from `RENDER_EXTERNAL_URL` —
+     there are **no hardcoded ports, URLs, or connection strings anywhere**.
+   - **Plain Web Service (manual env):** New → Web Service → Docker runtime. In
+     **Environment**, add:
+     - `DATABASE_URL` — the database's **Internal Connection String** (create a
+       Postgres instance first: New → PostgreSQL, same region, then copy from its
+       **Connect** page)
+     - `SESSION_SECRET` — any long random string
+     - `NODE_ENV=production`
+     - `ADMIN_EMAIL` + `ADMIN_PASSWORD` (the seed **refuses to run in production
+       without them** — no default admin password exists anymore)
+     - `MARKET_DATA_PROVIDER=simulated`
+     - `CLIENT_URL` — only if you serve the client from a different origin
+       (otherwise leave unset; it's derived from `RENDER_EXTERNAL_URL`)
 
 3. **First deploy notes**
    - The Docker build takes ~5–10 min (npm ci + Vite build + Prisma generate). That's normal.
