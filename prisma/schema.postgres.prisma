@@ -1,0 +1,340 @@
+// AadiInvest — PostgreSQL schema (production: Render Postgres, Neon, Supabase…)
+//
+// IMPORTANT money convention (must match the SQLite schema):
+//   - ALL monetary amounts are INTEGER CENTS ($800.00 → 80000).
+//   - Share quantities are INTEGER MICRO-SHARES (1 share = 1_000_000).
+// The server performs integer arithmetic only, so both schemas behave
+// identically. Order size is capped at 100 shares (1e8 micro-shares) to keep
+// every integer well inside Int4 range.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  username           String   @unique
+  usernameLower      String   @unique
+  displayName        String?
+  email              String   @unique
+  passwordHash       String
+  role               String   @default("USER")
+  emailVerified      Boolean  @default(false)
+  disabled           Boolean  @default(false)
+  xp                 Int      @default(0)
+  avatarColor        String   @default("#6366f1")
+  tutorialCompleted  Boolean  @default(false)
+  leaderboardVisible Boolean  @default(true)
+  notificationPrefs  Json     @default("{\"orderFilled\":true,\"achievements\":true,\"learning\":true,\"marketEvents\":true,\"support\":true}")
+  lastDailyChallenge String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  sessions          Session[]
+  wallet            Wallet?
+  investmentAccount InvestmentAccount?
+  holdings          Holding[]
+  orders            Order[]
+  transactions      Transaction[]
+  activity          ActivityEvent[]
+  watchlist         Watchlist?
+  tutorialProgress  TutorialProgress?
+  lessonProgress    LessonProgress[]
+  quizAttempts      QuizAttempt[]
+  achievements      UserAchievement[]
+  notifications     Notification[]
+  tickets           SupportTicket[]
+  snapshots         PortfolioSnapshot[]
+  dailyChallenges   DailyChallenge[]
+
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  identifier String
+  tokenHash  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int // cents
+  updatedAt DateTime @updatedAt
+}
+
+model InvestmentAccount {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cash      Int // cents
+  updatedAt DateTime @updatedAt
+}
+
+model Holding {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol      String
+  shares      Int // micro-shares
+  averageCost Int // cents per share
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, symbol])
+  @@index([symbol])
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  clientRequestId String?  @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  side            String
+  symbol          String
+  quantity        Int // micro-shares
+  price           Int? // cents per share at execution
+  total           Int? // cents
+  status          String
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([symbol])
+  @@index([status])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String
+  amount      Int // cents (negative = leaving the account)
+  account     String
+  symbol      String?
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([kind])
+}
+
+model Watchlist {
+  id        String          @id @default(cuid())
+  userId    String          @unique
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WatchlistItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  watchlistId String
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  symbol      String
+  createdAt   DateTime  @default(now())
+
+  @@unique([watchlistId, symbol])
+  @@index([symbol])
+}
+
+model TutorialProgress {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStep Int      @default(0)
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lesson {
+  id               String  @id @default(cuid())
+  slug             String  @unique
+  title            String
+  category         String
+  estimatedMinutes Int
+  xpReward         Int     @default(25)
+  body             String
+  example          String
+  order            Int     @default(0)
+
+  progress  LessonProgress[]
+  questions QuizQuestion[]
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+}
+
+model QuizQuestion {
+  id           String @id @default(cuid())
+  lessonId     String
+  lesson       Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  prompt       String
+  options      Json
+  correctIndex Int
+  explanation  String
+  order        Int    @default(0)
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  score     Int
+  total     Int
+  passed    Boolean
+  xpAwarded Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, lessonId])
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  description String
+  icon        String
+  xpReward    Int    @default(25)
+  order       Int    @default(0)
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model DailyChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  date      DateTime @db.Date
+  progress  Int      @default(0)
+  target    Int
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key, date])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model SupportTicket {
+  id           String   @id @default(cuid())
+  ticketNumber String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject      String
+  category     String
+  status       String   @default("OPEN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SupportMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String?
+  authorRole String
+  body       String
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+model MarketEvent {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  modifier    Float
+  active      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PortfolioSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  value     Int // cents
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  detail    String?
+  amount    Int? // cents
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

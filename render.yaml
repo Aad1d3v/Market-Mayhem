@@ -1,0 +1,55 @@
+# =============================================================================
+# AadiInvest — Render Blueprint
+# Deploys: Web Service (Docker) + managed PostgreSQL, env vars pre-wired.
+# Use: Render Dashboard → New → Blueprint → point at this repo.
+# ==============================================================================
+
+services:
+  - type: web
+    name: aadiinvest
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aadiinvest-db
+          property: connectionString
+      - key: INTERNAL_DATABASE_URL
+        fromDatabase:
+          name: aadiinvest-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        value: https://aadiinvest.onrender.com
+      - key: ADMIN_EMAIL
+        value: admin@aadiinvest.local
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: MARKET_DATA_PROVIDER
+        value: simulated
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: AadiInvest <no-reply@aadiinvest.example>
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+databases:
+  - name: aadiinvest-db
+    plan: free
+    region: oregon
+    databaseName: aadiinvest
+    user: aadiinvest
+    postgresMajorVersion: "16"

@@ -1,0 +1,48 @@
+{
+  "name": "aadiinvest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Market Mayhem — Learn the market. Risk nothing. A free educational stock-market simulation game. No real money.",
+  "workspaces": [
+    "packages/shared",
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "sh ./docker-start.sh",
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w packages/shared && npm run build -w server && npm run build -w client",
+    "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w server && npm run typecheck -w client",
+    "test": "npm test --workspaces --if-present",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio --schema prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --schema prisma/schema.prisma --force"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true
+  }
+}

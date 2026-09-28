@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aadiinvest-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aadiinvest
+      POSTGRES_PASSWORD: aadiinvest_dev_pw
+      POSTGRES_DB: aadiinvest
+    ports:
+      - "5432:5432"
+    volumes:
+      - aadiinvest_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aadiinvest -d aadiinvest"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  aadiinvest_pgdata:

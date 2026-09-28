@@ -1,0 +1,30 @@
+node_modules
+**/node_modules
+dist
+**/dist
+client/dist
+*.log
+server.log
+client.log
+server.err.log
+client.err.log
+.env
+.env.local
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+.git
+.gitignore
+.vscode
+.idea
+*.md
+!README.md
+aadidevs723.doc
+aadidevs723.docx
+
+# Nested repo copy and workspace noise
+market MMayham
+Market mayham (official)
+.freebuff
+node_modules/.cache
+**/*.tsbuildinfo
